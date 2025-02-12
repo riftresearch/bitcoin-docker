@@ -26,7 +26,6 @@ STACK_RUN_MEMPOOL_SPACE="False"
 # Allocated container IP
 STACK_NETWORK_SUBNET="10.21.0.0/16"
 STACK_BITCOIND_IP="10.21.22.3"
-STACK_BITCOIN_GUI_IP="10.21.22.4"
 STACK_ELECTRS_IP="10.21.22.5"
 STACK_ELECTRS_GUI_IP="10.21.22.6"
 STACK_MEMPOOL_IP="10.21.22.7"
@@ -39,7 +38,6 @@ STACK_BITCOIND_P2P_PORT="8333"
 STACK_BITCOIND_PUB_RAW_BLOCK_PORT="28332"
 STACK_BITCOIND_PUB_RAW_TX_PORT="28333"
 STACK_ELECTRS_PORT="50001"
-STACK_BITCOIN_GUI_PORT="3005"
 STACK_ELECTRS_GUI_PORT="3006"
 STACK_MEMPOOL_PORT="3007"
 STACK_MEMPOOL_API_PORT="3010"
@@ -72,8 +70,6 @@ handle_exit_code() {
 
 trap "handle_exit_code" EXIT
 
-// ... existing code for argument handling ...
-
 # Checks if docker is running
 if ( ! docker stats --no-stream > /dev/null); then
     echo -e " > ${CERROR}Docker is not running. Please double check and try again.${COFF}"
@@ -86,11 +82,6 @@ if ( ! python3 --version > /dev/null); then
     exit 1
 fi
 
-# Determine bitcoin_gui DEFAULT_NETWORK variable
-if [[ ${STACK_CRYPTO_NETWORK} == "mainnet" ]]; then
-    export BGUI_NETWORK="main"
-fi
-
 # Exporting device hostname to the compose files
 export DEVICE_DOMAIN_NAME=$HOSTNAME
 
@@ -99,7 +90,6 @@ export COMPOSE_IGNORE_ORPHANS="True"
 export APP_CRYPTO_NETWORK="${STACK_CRYPTO_NETWORK}"
 export APP_NETWORK_SUBNET="${STACK_NETWORK_SUBNET}"
 export APP_BITCOIND_IP="${STACK_BITCOIND_IP}"
-export APP_BITCOIN_GUI_IP="${STACK_BITCOIN_GUI_IP}"
 export APP_ELECTRS_IP="${STACK_ELECTRS_IP}"
 export APP_ELECTRS_GUI_IP="${STACK_ELECTRS_GUI_IP}"
 export APP_MEMPOOL_IP="${STACK_MEMPOOL_IP}"
@@ -148,14 +138,14 @@ BIN_ARGS_BITCOIND+=( "-rpcbind=${STACK_BITCOIND_IP}" )
 BIN_ARGS_BITCOIND+=( "-rpcbind=0.0.0.0" )
 BIN_ARGS_BITCOIND+=( "-rpcallowip=${STACK_NETWORK_SUBNET}" )
 BIN_ARGS_BITCOIND+=( "-rpcallowip=0.0.0.0" )
-BIN_ARGS_BITCOIND+=( "-rpcauth=\"${BITCOIN_RPC_AUTH}\"" )
+BIN_ARGS_BITCOIND+=( "-rpcauth=${BITCOIN_RPC_AUTH}" )
 BIN_ARGS_BITCOIND+=( "-zmqpubrawblock=tcp://0.0.0.0:${STACK_BITCOIND_PUB_RAW_BLOCK_PORT}" )
 BIN_ARGS_BITCOIND+=( "-zmqpubrawtx=tcp://0.0.0.0:${STACK_BITCOIND_PUB_RAW_TX_PORT}" )
 BIN_ARGS_BITCOIND+=( "-deprecatedrpc=create_bd" )
 BIN_ARGS_BITCOIND+=( "-deprecatedrpc=warnings" )
 
 # Export the generated command to the compose file
-export APP_BITCOIN_COMMAND=$(IFS=" "; echo -e "${BIN_ARGS_BITCOIND[@]}" | tr -d '"')
+export APP_BITCOIN_COMMAND="${BIN_ARGS_BITCOIND[*]}"
 
 # Update the electrs.toml file with auth details
 echo -e " > ${CINFO}Updating the electrs.toml file with auth details...${COFF}"
@@ -164,53 +154,53 @@ echo -e " > ${CSUCCESS}The electrs.toml file has been updated!${COFF}"
 
 # Create Docker network if it doesn't exist
 echo -e " > ${CINFO}Creating Docker network...${COFF}"
-if ! docker network inspect crypto_default >/dev/null 2>&1; then
-    docker network create --subnet=${STACK_NETWORK_SUBNET} crypto_default
-    echo -e " > ${CSUCCESS}Docker network created!${COFF}"
-else
-    echo -e " > ${CSUCCESS}Docker network already exists!${COFF}"
+if docker network inspect crypto_default >/dev/null 2>&1; then
+    echo -e " > ${CINFO}Removing existing network...${COFF}"
+    docker network rm crypto_default
 fi
+
+docker network create \
+    --subnet=${STACK_NETWORK_SUBNET} \
+    --label com.docker.compose.network=default \
+    --label com.docker.compose.project=crypto \
+    crypto_default
+echo -e " > ${CSUCCESS}Docker network created!${COFF}"
 
 # Run the containers
-echo -e " > ${CINFO}Running bitcoind and bitcoin_gui containers...${COFF}"
-docker-compose --log-level ERROR -p crypto --file ./compose/docker-bitcoin.yml up --detach bitcoind bitcoin_gui
-echo -e " > ${CSUCCESS}Containers launched!${COFF}"
+echo -e " > ${CINFO}Running bitcoind container...${COFF}"
+docker-compose --log-level ERROR -p crypto --file ./compose/docker-bitcoin.yml up -d bitcoind
 
-echo -e " > ${CINFO}Running electrs, electrs_gui and explorer containers...${COFF}"
-if [[ ${STACK_RUN_MEMPOOL_SPACE} == "False" ]]; then
-    docker-compose --log-level ERROR -p crypto --file ./compose/docker-electrs.yml up --detach electrs electrs_gui btc_explorer
-else
-    docker-compose --log-level ERROR -p crypto --file ./compose/docker-electrs.yml up --detach electrs electrs_gui mempool_space_web mempool_space_api mempool_space_db
-fi
-echo -e " > ${CSUCCESS}Containers launched!${COFF}"
-
+# Comment out this entire block properly using standard bash comments
+# echo -e " > ${CINFO}Waiting for bitcoind to be ready...${COFF}"
+# sleep 10
+# 
+# echo -e " > ${CINFO}Running electrs, electrs_gui and explorer containers...${COFF}"
+# if [[ ${STACK_RUN_MEMPOOL_SPACE} == "False" ]]; then
+#     docker-compose --log-level ERROR -p crypto --file ./compose/docker-electrs.yml up -d --force-recreate electrs electrs_gui btc_explorer
+# else
+#     docker-compose --log-level ERROR -p crypto --file ./compose/docker-electrs.yml up -d --force-recreate electrs electrs_gui mempool_space_web mempool_space_api mempool_space_db
+# fi
+# 
 # Check container status and display URLs
-if ( ! docker logs bitcoin_gui > /dev/null); then
-    echo -e " > ${CERROR}Bitcoin Node UI is not running due to an error.${COFF}"
-    exit 1
-else
-    echo -e " > ${CINFO}Bitcoin Node UI is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_BITCOIN_GUI_PORT} ${COFF}"
-fi
-
-if ( ! docker logs electrs_gui > /dev/null); then
-    echo -e " > ${CERROR}Electrum Server UI is not running due to an error.${COFF}"
-    exit 1
-else
-    echo -e " > ${CINFO}Electrum Server UI is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_ELECTRS_GUI_PORT} ${COFF}"
-fi
-
-if [[ ${STACK_RUN_MEMPOOL_SPACE} == "False" ]]; then
-    if ( ! docker logs btc_explorer > /dev/null); then
-        echo -e " > ${CERROR}BTC RPC Explorer is not running due to an error.${COFF}"
-        exit 1
-    else
-        echo -e " > ${CINFO}BTC RPC Explorer is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_MEMPOOL_PORT} ${COFF}"
-    fi
-else 
-    if ( ! docker logs mempool_space_web > /dev/null); then
-        echo -e " > ${CERROR}Mempool Space Explorer is not running due to an error.${COFF}"
-        exit 1
-    else
-        echo -e " > ${CINFO}Mempool Space Explorer is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_MEMPOOL_PORT} ${COFF}"
-    fi
-fi
+# if ( ! docker logs electrs_gui > /dev/null); then
+#     echo -e " > ${CERROR}Electrum Server UI is not running due to an error.${COFF}"
+#     exit 1
+# else
+#     echo -e " > ${CINFO}Electrum Server UI is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_ELECTRS_GUI_PORT} ${COFF}"
+# fi
+# 
+# if [[ ${STACK_RUN_MEMPOOL_SPACE} == "False" ]]; then
+#     if ( ! docker logs btc_explorer > /dev/null); then
+#         echo -e " > ${CERROR}BTC RPC Explorer is not running due to an error.${COFF}"
+#         exit 1
+#     else
+#         echo -e " > ${CINFO}BTC RPC Explorer is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_MEMPOOL_PORT} ${COFF}"
+#     fi
+# else 
+#     if ( ! docker logs mempool_space_web > /dev/null); then
+#         echo -e " > ${CERROR}Mempool Space Explorer is not running due to an error.${COFF}"
+#         exit 1
+#     else
+#         echo -e " > ${CINFO}Mempool Space Explorer is running on${COFF}${CLINK} http://${DEVICE_DOMAIN_NAME}:${STACK_MEMPOOL_PORT} ${COFF}"
+#     fi
+# fi

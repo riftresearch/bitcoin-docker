@@ -16,38 +16,3 @@ services:
     networks:
       default:
         ipv4_address: "${APP_BITCOIND_IP}"
-  bitcoin_gui:
-    container_name: bitcoin_gui
-    image: getumbrel/umbrel-bitcoin:v0.8.0
-    restart: on-failure
-    depends_on: [bitcoind]
-    ports:
-      - "${APP_BITCOIN_GUI_PORT}:${APP_BITCOIN_GUI_PORT}"
-    volumes:
-      - "../volumes/bitcoin/gui:/data"
-      - "../volumes/bitcoin/node:/bitcoin/.bitcoin"
-    environment:
-      PORT: "${APP_BITCOIN_GUI_PORT}"
-      BITCOIN_HOST: "${APP_BITCOIND_IP}"
-      RPC_PORT: "${APP_BITCOIND_RPC_PORT}"
-      BITCOIN_RPC_PORT: "${APP_BITCOIND_RPC_PORT}"
-      RPC_USER: "${APP_BITCOIN_RPC_USERNAME}"
-      BITCOIN_RPC_USER: "${APP_BITCOIN_RPC_USERNAME}"
-      RPC_PASSWORD: "${APP_BITCOIN_RPC_PASSWORD}"
-      BITCOIN_RPC_PASSWORD: "${APP_BITCOIN_RPC_PASSWORD}"
-      BITCOIN_RPC_HIDDEN_SERVICE: "${APP_BITCOIN_RPC_HIDDEN_SERVICE}"
-      BITCOIN_P2P_HIDDEN_SERVICE: "${APP_BITCOIN_P2P_HIDDEN_SERVICE}"
-      BITCOIN_P2P_PORT: "${APP_BITCOIND_P2P_PORT}"
-      DEVICE_DOMAIN_NAME: "${DEVICE_DOMAIN_NAME}"
-      BITCOIN_DEFAULT_NETWORK: "${BGUI_NETWORK}"
-      BITCOIN_INITIALIZE_WITH_CLEARNET_OVER_TOR: "true"
-      BITCOIND_IP: "${APP_BITCOIND_IP}"
-      TOR_PROXY_IP: "${APP_TOR_IP}"
-      TOR_PROXY_PORT: "${APP_TOR_SOCKS_PORT}"
-      TOR_PROXY_CONTROL_PORT: "${APP_TOR_CONTROL_PORT}"
-      TOR_PROXY_CONTROL_PASSWORD: "${APP_TOR_PROXY_PASSWORD}"
-      I2P_DAEMON_IP: "${APP_I2PD_IP}"
-      I2P_DAEMON_PORT: "${APP_I2PD_PORT}"
-    networks:
-      default:
-        ipv4_address: "${APP_BITCOIN_GUI_IP}"

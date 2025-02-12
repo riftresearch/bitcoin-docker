@@ -162,6 +162,15 @@ echo -e " > ${CINFO}Updating the electrs.toml file with auth details...${COFF}"
 echo "auth=\"${BITCOIN_RPC_USERNAME}:${BITCOIN_RPC_PASSWORD}\"" | tee ./volumes/electrs/electrs.toml > /dev/null
 echo -e " > ${CSUCCESS}The electrs.toml file has been updated!${COFF}"
 
+# Create Docker network if it doesn't exist
+echo -e " > ${CINFO}Creating Docker network...${COFF}"
+if ! docker network inspect crypto_default >/dev/null 2>&1; then
+    docker network create --subnet=${STACK_NETWORK_SUBNET} crypto_default
+    echo -e " > ${CSUCCESS}Docker network created!${COFF}"
+else
+    echo -e " > ${CSUCCESS}Docker network already exists!${COFF}"
+fi
+
 # Run the containers
 echo -e " > ${CINFO}Running bitcoind and bitcoin_gui containers...${COFF}"
 docker-compose --log-level ERROR -p crypto --file ./compose/docker-bitcoin.yml up --detach bitcoind bitcoin_gui

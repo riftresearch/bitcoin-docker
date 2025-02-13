@@ -135,6 +135,13 @@ BIN_ARGS_BITCOIND+=( "-zmqpubrawblock=tcp://0.0.0.0:${STACK_BITCOIND_PUB_RAW_BLO
 BIN_ARGS_BITCOIND+=( "-zmqpubrawtx=tcp://0.0.0.0:${STACK_BITCOIND_PUB_RAW_TX_PORT}" )
 BIN_ARGS_BITCOIND+=( "-deprecatedrpc=create_bd" )
 BIN_ARGS_BITCOIND+=( "-deprecatedrpc=warnings" )
+BIN_ARGS_BITCOIND+=( "-maxconnections=500" ) # tuned for machine
+BIN_ARGS_BITCOIND+=( "-dbcache=16384" ) # tuned fo 16 gb of RAM 
+BIN_ARGS_BITCOIND+=( "-assumevalid=000000000000000000001aa88fee6115a65ee5745db6787a840e1189ac46b04d" ) # block 850400
+BIN_ARGS_BITCOIND+=( "-txindex=1" )
+
+
+
 
 # Export the generated command to the compose file
 export APP_BITCOIN_COMMAND="${BIN_ARGS_BITCOIND[*]}"
@@ -161,6 +168,7 @@ fi
 # Run the containers
 echo -e " > ${CINFO}Running bitcoind container...${COFF}"
 docker-compose --log-level ERROR -p crypto --file ./compose/docker-bitcoin.yml up -d bitcoind
+
 
 # Comment out this entire block properly using standard bash comments
 # echo -e " > ${CINFO}Waiting for bitcoind to be ready...${COFF}"

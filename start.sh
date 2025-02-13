@@ -139,7 +139,7 @@ BIN_ARGS_BITCOIND+=( "-maxconnections=500" ) # tuned for machine
 BIN_ARGS_BITCOIND+=( "-dbcache=16384" ) # tuned fo 16 gb of RAM 
 BIN_ARGS_BITCOIND+=( "-assumevalid=000000000000000000001aa88fee6115a65ee5745db6787a840e1189ac46b04d" ) # block 850400
 BIN_ARGS_BITCOIND+=( "-txindex=1" )
-
+BIN_ARGS_BITCOIND+=( "-par=8" )
 
 
 

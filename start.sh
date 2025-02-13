@@ -50,8 +50,8 @@ STACK_ELECTRS_USER_INFO="${STACK_UID}:${STACK_GID}"
 STACK_MEMPOOL_USER_INFO="${STACK_UID}:${STACK_GID}"
 
 # Allocated sensitive container variables
-STACK_BITCOIND_USERNAME="yourfavusername"
-STACK_BITCOIND_PASSWORD="yourbitcoinpasswordd" # Leave blank to generate random password
+STACK_BITCOIND_USERNAME="yourusername"
+STACK_BITCOIND_PASSWORD="yourpassword" # Leave blank to generate random password
 STACK_MEMPOOL_DB_USERNAME="mempool"
 STACK_MEMPOOL_DB_PASSWORD="mempoolpasswordd"
 STACK_MEMPOOL_DB_ROOT_PASSWORD="mempoolrootpasswordd"
@@ -111,20 +111,12 @@ export APP_MEMPOOL_DB_USERNAME="${STACK_MEMPOOL_DB_USERNAME}"
 export APP_MEMPOOL_DB_PASSWORD="${STACK_MEMPOOL_DB_PASSWORD}"
 export APP_MEMPOOL_DB_ROOT_PASSWORD="${STACK_MEMPOOL_DB_ROOT_PASSWORD}"
 
+#!/bin/bash
+
 # Generate and hash bitcoin node password / auth details
 echo -e " > ${CINFO}Generating bitcoin node details...${COFF}"
 BITCOIN_RPC_USERNAME="${STACK_BITCOIND_USERNAME}"
-
-if [[ ${STACK_BITCOIND_PASSWORD} == "" ]]; then
-    BITCOIN_RPC_DETAILS=$("./scripts/rpcauth.py" "${BITCOIN_RPC_USERNAME}")
-    BITCOIN_RPC_PASSWORD=$(echo -e "$BITCOIN_RPC_DETAILS" | tail -1)
-else
-    BITCOIN_RPC_DETAILS=$("./scripts/rpcauth.py" "${BITCOIN_RPC_USERNAME}" "${STACK_BITCOIND_PASSWORD}")
-    BITCOIN_RPC_PASSWORD="${STACK_BITCOIND_PASSWORD}"
-fi
-
-BITCOIN_RPC_AUTH=$(echo -e "$BITCOIN_RPC_DETAILS" | head -2 | tail -1 | sed -e "s/^rpcauth=//")
-echo -e " > ${CSUCCESS}Bitcoin node details generated successfully!${COFF}"
+BITCOIN_RPC_PASSWORD="${STACK_BITCOIND_PASSWORD}"
 
 # Export bitcoin node username and password to compose files
 export APP_BITCOIN_RPC_USERNAME="${BITCOIN_RPC_USERNAME}"
@@ -134,11 +126,11 @@ export APP_BITCOIN_RPC_PASSWORD="${BITCOIN_RPC_PASSWORD}"
 BIN_ARGS_BITCOIND=()
 BIN_ARGS_BITCOIND+=( "-port=${STACK_BITCOIND_P2P_PORT}" )
 BIN_ARGS_BITCOIND+=( "-rpcport=${STACK_BITCOIND_RPC_PORT}" )
-BIN_ARGS_BITCOIND+=( "-rpcbind=${STACK_BITCOIND_IP}" )
-BIN_ARGS_BITCOIND+=( "-rpcbind=0.0.0.0" )
-BIN_ARGS_BITCOIND+=( "-rpcallowip=${STACK_NETWORK_SUBNET}" )
-BIN_ARGS_BITCOIND+=( "-rpcallowip=0.0.0.0" )
-BIN_ARGS_BITCOIND+=( "-rpcauth=${BITCOIN_RPC_AUTH}" )
+BIN_ARGS_BITCOIND+=( "-rpcbind=${STACK_BITCOIND_IP}" )   # Use only one correct IP
+BIN_ARGS_BITCOIND+=( "-rpcallowip=0.0.0.0/0" ) # Allow only the correct subnet
+BIN_ARGS_BITCOIND+=( "-rpcuser=${APP_BITCOIN_RPC_USERNAME}" )
+BIN_ARGS_BITCOIND+=( "-rpcpassword=${APP_BITCOIN_RPC_PASSWORD}" )
+BIN_ARGS_BITCOIND+=( "-server=1" )
 BIN_ARGS_BITCOIND+=( "-zmqpubrawblock=tcp://0.0.0.0:${STACK_BITCOIND_PUB_RAW_BLOCK_PORT}" )
 BIN_ARGS_BITCOIND+=( "-zmqpubrawtx=tcp://0.0.0.0:${STACK_BITCOIND_PUB_RAW_TX_PORT}" )
 BIN_ARGS_BITCOIND+=( "-deprecatedrpc=create_bd" )
@@ -152,19 +144,19 @@ echo -e " > ${CINFO}Updating the electrs.toml file with auth details...${COFF}"
 echo "auth=\"${BITCOIN_RPC_USERNAME}:${BITCOIN_RPC_PASSWORD}\"" | tee ./volumes/electrs/electrs.toml > /dev/null
 echo -e " > ${CSUCCESS}The electrs.toml file has been updated!${COFF}"
 
-# Create Docker network if it doesn't exist
-echo -e " > ${CINFO}Creating Docker network...${COFF}"
-if docker network inspect crypto_default >/dev/null 2>&1; then
-    echo -e " > ${CINFO}Removing existing network...${COFF}"
-    docker network rm crypto_default
+# Create Docker network if it does not exist
+echo -e " > ${CINFO}Checking Docker network...${COFF}"
+if ! docker network inspect crypto_default >/dev/null 2>&1; then
+    echo -e " > ${CINFO}Creating new Docker network...${COFF}"
+    docker network create \
+        --subnet=${STACK_NETWORK_SUBNET} \
+        --label com.docker.compose.network=default \
+        --label com.docker.compose.project=crypto \
+        crypto_default
+    echo -e " > ${CSUCCESS}Docker network created!${COFF}"
+else
+    echo -e " > ${CSUCCESS}Docker network already exists! Skipping recreation.${COFF}"
 fi
-
-docker network create \
-    --subnet=${STACK_NETWORK_SUBNET} \
-    --label com.docker.compose.network=default \
-    --label com.docker.compose.project=crypto \
-    crypto_default
-echo -e " > ${CSUCCESS}Docker network created!${COFF}"
 
 # Run the containers
 echo -e " > ${CINFO}Running bitcoind container...${COFF}"

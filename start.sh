@@ -167,7 +167,7 @@ fi
 
 # Run the containers
 echo -e " > ${CINFO}Running bitcoind container...${COFF}"
-docker-compose --log-level ERROR -p crypto --file ./compose/docker-bitcoin.yml up -d bitcoind
+docker compose -p crypto -f ./compose/docker-bitcoin.yml up -d bitcoind
 
 
 # Comment out this entire block properly using standard bash comments
